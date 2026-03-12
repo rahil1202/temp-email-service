@@ -120,14 +120,11 @@ Domains:
 Create one route per domain:
 
 ```text
-match_recipient(".*@pdfwork\\.space")
-forward("https://receive-email.example.appwrite.run")
 
 match_recipient(".*@rahil\\.pro")
 forward("https://receive-email.example.appwrite.run")
 
-match_recipient(".*@eatnbill\\.in")
-forward("https://receive-email.example.appwrite.run")
+
 ```
 
 Mailgun includes `timestamp`, `token`, and `signature`; the `receive-email` function verifies those before storing mail.
