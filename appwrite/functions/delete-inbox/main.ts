@@ -2,7 +2,7 @@ import { createFunctionServices } from "@/appwrite/functions/_shared/appwrite";
 import { deleteInbox } from "@/appwrite/functions/_shared/handlers";
 import { failure, json, maybeHandleOptions } from "@/appwrite/functions/_shared/responses";
 import type { AppwriteContext } from "@/appwrite/functions/_shared/types";
-import type { DeleteInboxInput } from "@/shared/types";
+import { parseDeleteInboxInput } from "@/lib/server/validation";
 
 export default async function main(context: AppwriteContext) {
   const preflight = maybeHandleOptions(context);
@@ -10,7 +10,7 @@ export default async function main(context: AppwriteContext) {
 
   try {
     const services = createFunctionServices(context.req.headers);
-    const body = (context.req.bodyJson ?? {}) as DeleteInboxInput;
+    const body = parseDeleteInboxInput(context.req.bodyJson ?? {});
     const result = await deleteInbox(services, body);
     return json(context, result);
   } catch (error) {

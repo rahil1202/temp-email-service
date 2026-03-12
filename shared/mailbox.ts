@@ -19,6 +19,7 @@ export type GeneratedMailboxIdentity = {
 type RandomSource = () => number;
 
 const defaultRandom: RandomSource = () => Math.random();
+const CUSTOM_LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{1,30}[a-z0-9])?$/;
 
 function sample<T>(items: readonly T[], random: RandomSource): T {
   return items[Math.floor(random() * items.length)];
@@ -65,6 +66,56 @@ export function withCollisionSuffix(localPartBase: string, collisionNumber: numb
 
 export function normalizeEmailAddress(emailAddress: string): string {
   return emailAddress.trim().toLowerCase();
+}
+
+export function isValidCustomLocalPart(localPart: string): boolean {
+  return CUSTOM_LOCAL_PART_PATTERN.test(localPart) && !localPart.includes("..");
+}
+
+export function parseManagedEmailAddress(
+  emailAddress: string,
+  allowedDomains: readonly MailDomain[]
+): { localPart: string; domain: MailDomain } {
+  const normalized = normalizeEmailAddress(emailAddress);
+  const [localPart, domain] = normalized.split("@");
+
+  if (!localPart || !domain) {
+    throw new Error("Custom email must include a local part and supported domain");
+  }
+
+  if (!allowedDomains.includes(domain as MailDomain)) {
+    throw new Error("Custom email must use a supported inbox domain");
+  }
+
+  if (!isValidCustomLocalPart(localPart)) {
+    throw new Error("Custom email local part must be 3-32 chars and use only letters, numbers, dots, hyphens, or underscores");
+  }
+
+  return {
+    localPart,
+    domain: domain as MailDomain
+  };
+}
+
+export function createCustomMailboxIdentity(
+  emailAddress: string,
+  allowedDomains: readonly MailDomain[]
+): GeneratedMailboxIdentity {
+  const { localPart, domain } = parseManagedEmailAddress(emailAddress, allowedDomains);
+  const displayName = localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+  return {
+    firstName: localPart,
+    surname: "",
+    displayName: displayName || localPart,
+    localPartBase: localPart,
+    domain,
+    emailAddress: `${localPart}@${domain}`
+  };
 }
 
 export function createRestoreUrl(baseUrl: string, emailAddress: string, accessToken: string): string {

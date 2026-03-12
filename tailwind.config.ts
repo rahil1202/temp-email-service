@@ -11,25 +11,23 @@ const config: Config = {
     extend: {
       colors: {
         ink: {
-          950: "#04131a",
-          900: "#0b1f28",
-          800: "#103243",
-          100: "#d7f2f5"
+          950: "#050505",
+          900: "#101010",
+          800: "#181818",
+          100: "#faf7f5"
         },
-        flare: {
-          500: "#ff8a3d",
-          400: "#ffa154"
-        },
-        aqua: {
-          500: "#39d0c7",
-          400: "#67e7dd"
+        redtone: {
+          600: "#7d1418",
+          500: "#b61d22",
+          400: "#d92e34",
+          300: "#f06b70"
         }
       },
       boxShadow: {
-        panel: "0 24px 80px rgba(3, 19, 26, 0.35)"
+        panel: "0 24px 80px rgba(0, 0, 0, 0.38)"
       },
       backgroundImage: {
-        "hero-grid": "radial-gradient(circle at top, rgba(103, 231, 221, 0.18), transparent 40%), radial-gradient(circle at 20% 20%, rgba(255, 138, 61, 0.18), transparent 30%)"
+        "hero-grid": "radial-gradient(circle at top left, rgba(182, 29, 34, 0.2), transparent 34%), radial-gradient(circle at 85% 10%, rgba(255, 255, 255, 0.08), transparent 24%)"
       }
     }
   },

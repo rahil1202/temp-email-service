@@ -28,10 +28,10 @@ function parseDomains(raw: string | undefined): MailDomain[] {
 
 export function getPublicEnv(): PublicEnv {
   return {
-    createInboxUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_CREATE_INBOX_URL", "/"),
-    getInboxUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_GET_INBOX_URL", "/"),
-    getEmailUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_GET_EMAIL_URL", "/"),
-    deleteInboxUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_DELETE_INBOX_URL", "/"),
+    createInboxUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_CREATE_INBOX_URL", "/api/functions/create-inbox"),
+    getInboxUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_GET_INBOX_URL", "/api/functions/get-inbox"),
+    getEmailUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_GET_EMAIL_URL", "/api/functions/get-email"),
+    deleteInboxUrl: requireValue("NEXT_PUBLIC_APPWRITE_FUNCTION_DELETE_INBOX_URL", "/api/functions/delete-inbox"),
     pollIntervalMs: Number(process.env.NEXT_PUBLIC_INBOX_POLL_MS ?? POLL_INTERVAL_MS),
     restoreBaseUrl: requireValue("NEXT_PUBLIC_RESTORE_BASE_URL", "http://localhost:3000"),
     domains: parseDomains(process.env.NEXT_PUBLIC_MAIL_DOMAINS)

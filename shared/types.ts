@@ -36,6 +36,7 @@ export type InboxEmailDetail = InboxEmailSummary & {
 
 export type CreateInboxInput = {
   preferredDomain?: DomainPreference;
+  customEmailAddress?: string;
 };
 
 export type CreateInboxResult = InboxSession;
@@ -67,4 +68,29 @@ export type DeleteInboxInput = {
 
 export type DeleteInboxResult = {
   deleted: boolean;
+};
+
+export type LookupInboxInput = {
+  emailAddress: string;
+};
+
+export type LookupEmailInput = {
+  emailAddress: string;
+  emailId: string;
+};
+
+export type FunctionHealthStatus = {
+  createInboxUrl: string;
+  getInboxUrl: string;
+  getEmailUrl: string;
+  deleteInboxUrl: string;
+  apiEndpointConfigured: boolean;
+  projectConfigured: boolean;
+  apiKeyConfigured: boolean;
+  functionStatuses: Array<{
+    id: string;
+    enabled: boolean;
+    live: boolean;
+    deploymentStatus: string | null;
+  }>;
 };

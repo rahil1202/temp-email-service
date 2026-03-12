@@ -14,9 +14,12 @@ await build({
   bundle: true,
   format: "esm",
   platform: "node",
-  target: "node20",
+  target: "node22",
   outbase: ".",
   outdir: "dist",
   sourcemap: false,
-  logLevel: "info"
+  logLevel: "info",
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url);`
+  }
 });

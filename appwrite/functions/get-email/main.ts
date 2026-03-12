@@ -2,7 +2,7 @@ import { createFunctionServices } from "@/appwrite/functions/_shared/appwrite";
 import { getEmail } from "@/appwrite/functions/_shared/handlers";
 import { failure, json, maybeHandleOptions } from "@/appwrite/functions/_shared/responses";
 import type { AppwriteContext } from "@/appwrite/functions/_shared/types";
-import type { GetEmailInput } from "@/shared/types";
+import { parseGetEmailInput } from "@/lib/server/validation";
 
 export default async function main(context: AppwriteContext) {
   const preflight = maybeHandleOptions(context);
@@ -10,7 +10,7 @@ export default async function main(context: AppwriteContext) {
 
   try {
     const services = createFunctionServices(context.req.headers);
-    const body = (context.req.bodyJson ?? {}) as GetEmailInput;
+    const body = parseGetEmailInput(context.req.bodyJson ?? {});
     const result = await getEmail(services, body);
     return json(context, result);
   } catch (error) {

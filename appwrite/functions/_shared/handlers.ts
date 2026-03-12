@@ -1,4 +1,10 @@
-import { createMailboxIdentity, createRestoreUrl, normalizeEmailAddress, withCollisionSuffix } from "@/shared/mailbox";
+import {
+  createCustomMailboxIdentity,
+  createMailboxIdentity,
+  createRestoreUrl,
+  normalizeEmailAddress,
+  withCollisionSuffix
+} from "@/shared/mailbox";
 import type {
   CreateInboxInput,
   CreateInboxResult,
@@ -44,8 +50,38 @@ export async function createInbox(
   input: CreateInboxInput | undefined
 ): Promise<CreateInboxResult> {
   const preferredDomain = input?.preferredDomain;
+  const customEmailAddress = input?.customEmailAddress;
   const expiresAt = nowPlusHours(services.env.ttlHours);
   const createdAt = new Date().toISOString();
+
+  if (customEmailAddress) {
+    const identity = createCustomMailboxIdentity(customEmailAddress, services.env.domains);
+    const existingInbox = await services.findInboxByEmail(identity.emailAddress);
+
+    if (existingInbox) {
+      throw new Error("That email address is already reserved. Try another one.");
+    }
+
+    const accessToken = generateAccessToken();
+    await services.createInboxDocument({
+      email_address: identity.emailAddress,
+      access_token_hash: hashAccessToken(accessToken, services.env.tokenPepper),
+      domain: identity.domain,
+      display_name: identity.displayName,
+      created_at: createdAt,
+      expires_at: expiresAt,
+      last_seen_at: createdAt
+    });
+
+    return {
+      emailAddress: identity.emailAddress,
+      accessToken,
+      expiresAt,
+      domain: identity.domain,
+      restoreUrl: createRestoreUrl(services.env.publicAppUrl, identity.emailAddress, accessToken),
+      displayName: identity.displayName
+    };
+  }
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const identity = createMailboxIdentity(preferredDomain);

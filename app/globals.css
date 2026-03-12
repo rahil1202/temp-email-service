@@ -4,11 +4,16 @@
 
 :root {
   color-scheme: dark;
-  --bg: #04131a;
-  --panel: rgba(10, 31, 40, 0.78);
-  --panel-border: rgba(113, 233, 225, 0.16);
-  --text: #eef9fb;
-  --muted: #9ec8ce;
+  --bg: #060606;
+  --bg-soft: #111111;
+  --panel: rgba(18, 18, 18, 0.88);
+  --panel-strong: rgba(10, 10, 10, 0.96);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text: #faf7f5;
+  --muted: rgba(250, 247, 245, 0.56);
+  --accent: #b61d22;
+  --accent-soft: #7d1418;
+  --accent-glow: rgba(182, 29, 34, 0.32);
 }
 
 * {
@@ -17,18 +22,21 @@
 
 html {
   min-height: 100%;
-  background:
-    radial-gradient(circle at top, rgba(57, 208, 199, 0.14), transparent 30%),
-    radial-gradient(circle at 20% 10%, rgba(255, 138, 61, 0.14), transparent 24%),
-    linear-gradient(180deg, #04131a 0%, #071c24 100%);
+  background: #050505;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
-  background: transparent;
-  font-family: var(--font-heading), sans-serif;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(217, 46, 52, 0.2), transparent 22%),
+    radial-gradient(circle at 80% 18%, rgba(125, 20, 24, 0.18), transparent 24%),
+    linear-gradient(180deg, #040404 0%, #090909 48%, #050505 100%);
+  font-family: var(--font-body), sans-serif;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
 }
 
 a {
@@ -45,7 +53,7 @@ textarea {
 
 .mail-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(103, 231, 221, 0.35) transparent;
+  scrollbar-color: rgba(182, 29, 34, 0.45) transparent;
 }
 
 .mail-scrollbar::-webkit-scrollbar {
@@ -54,6 +62,68 @@ textarea {
 }
 
 .mail-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(103, 231, 221, 0.35);
+  background: rgba(182, 29, 34, 0.45);
   border-radius: 999px;
+}
+
+::selection {
+  background: rgba(182, 29, 34, 0.35);
+  color: #fff;
+}
+
+@keyframes redDrift {
+  0% {
+    transform: translate3d(-6%, -5%, 0) scale(1);
+    opacity: 0.62;
+  }
+  33% {
+    transform: translate3d(5%, 3%, 0) scale(1.12);
+    opacity: 0.96;
+  }
+  66% {
+    transform: translate3d(-3%, 5%, 0) scale(0.94);
+    opacity: 0.76;
+  }
+  100% {
+    transform: translate3d(-6%, -5%, 0) scale(1);
+    opacity: 0.62;
+  }
+}
+
+@keyframes redFlow {
+  0% {
+    transform: translate3d(-8%, -4%, 0) rotate(0deg) scale(1.05);
+    opacity: 0.52;
+  }
+  25% {
+    transform: translate3d(6%, 3%, 0) rotate(8deg) scale(1.12);
+    opacity: 0.74;
+  }
+  50% {
+    transform: translate3d(2%, 8%, 0) rotate(-6deg) scale(0.96);
+    opacity: 0.58;
+  }
+  75% {
+    transform: translate3d(-5%, 2%, 0) rotate(5deg) scale(1.08);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate3d(-8%, -4%, 0) rotate(0deg) scale(1.05);
+    opacity: 0.52;
+  }
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(24, 24, 24, 0.52), rgba(10, 10, 10, 0.36));
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 60px rgba(0, 0, 0, 0.28);
+}
+
+.glass-soft {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
 }

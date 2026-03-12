@@ -11,7 +11,7 @@ export function EmailFrame({ bodyHtml }: EmailFrameProps) {
     <iframe
       title="Email content"
       sandbox=""
-      className="h-[28rem] w-full rounded-3xl border border-white/10 bg-ink-950"
+      className="h-full min-h-[16rem] w-full rounded-[2rem] border border-white/10 bg-[#070707]"
       srcDoc={buildEmailSrcDoc(bodyHtml)}
     />
   );

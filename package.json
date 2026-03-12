@@ -1,7 +1,32 @@
 {
   "name": "temp-email-appwrite",
   "version": "0.1.0",
-  "private": true,
+  "description": "Temporary email service built with Next.js, Appwrite, Mailgun, and Cloudflare.",
+  "private": false,
+  "license": "MIT",
+  "author": {
+    "name": "rahil1202",
+    "email": "rahilisvahora@gmail.com",
+    "url": "https://github.com/rahil1202"
+  },
+  "homepage": "https://github.com/rahil1202/temp-email-service#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rahil1202/temp-email-service.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rahil1202/temp-email-service/issues"
+  },
+  "keywords": [
+    "temporary-email",
+    "temp-mail",
+    "nextjs",
+    "appwrite",
+    "mailgun",
+    "cloudflare",
+    "inbox",
+    "serverless"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -47,5 +72,6 @@
   "engines": {
     "node": ">=20.0.0",
     "bun": ">=1.1.0"
-  }
+  },
+  "packageManager": "npm@10"
 }

@@ -2,7 +2,7 @@ import { createFunctionServices } from "@/appwrite/functions/_shared/appwrite";
 import { createInbox } from "@/appwrite/functions/_shared/handlers";
 import { failure, json, maybeHandleOptions } from "@/appwrite/functions/_shared/responses";
 import type { AppwriteContext } from "@/appwrite/functions/_shared/types";
-import type { CreateInboxInput } from "@/shared/types";
+import { parseCreateInboxInput } from "@/lib/server/validation";
 
 export default async function main(context: AppwriteContext) {
   const preflight = maybeHandleOptions(context);
@@ -10,7 +10,7 @@ export default async function main(context: AppwriteContext) {
 
   try {
     const services = createFunctionServices(context.req.headers);
-    const body = (context.req.bodyJson ?? {}) as CreateInboxInput;
+    const body = parseCreateInboxInput(context.req.bodyJson ?? {});
     const result = await createInbox(services, body);
     return json(context, result);
   } catch (error) {

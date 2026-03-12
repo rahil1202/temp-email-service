@@ -1,78 +1,140 @@
-# Temporary Email Service
+# Temp Email Service
 
-Temporary email inboxes built with Next.js 14, Appwrite Pro, Mailgun inbound routes, and Cloudflare-managed domains.
+Temporary email inboxes built with Next.js 14, Appwrite, Mailgun inbound routes, and Cloudflare-managed domains.
 
-## What is included
+## Features
 
-- Next.js 14 App Router frontend with TailwindCSS, Zustand state, dark UI, QR restore flow, and 5-second inbox polling.
-- Appwrite Function source for `create-inbox`, `receive-email`, `get-inbox`, `get-email`, `delete-inbox`, and `cleanup-expired`.
-- Appwrite Storage download proxy route for attachments through [`app/api/attachments/[fileId]/route.ts`](./app/api/attachments/%5BfileId%5D/route.ts).
-- Tests covering name generation, Mailgun validation/sanitization helpers, core handler flows, and the HTML viewer.
+- Temporary inbox generation with realistic random email identities
+- Read-only lookup for previously created inboxes from the last 24 hours
+- Appwrite-backed inbox, email, and attachment storage
+- Mailgun inbound processing for incoming mail
+- QR-based inbox restore flow
+- Per-IP daily inbox creation rate limiting
+- Input validation, proxy hardening, and security headers
 
-## Local development
+## Stack
 
-1. Copy `.env.example` to `.env.local` and fill the Vercel and Appwrite values.
-2. Install dependencies with `bun install`.
-3. Start the frontend with `bun run dev`.
-4. Run tests with `bun run test`.
-5. Build Appwrite function bundles with `bun run build:functions`.
+- Next.js 14
+- React 18
+- Tailwind CSS
+- Appwrite
+- Mailgun
+- Cloudflare DNS
+- Zustand
+- Vitest
 
-## Appwrite setup
+## Project Structure
+
+```text
+app/                     Next.js app router pages and API routes
+appwrite/functions/      Appwrite function source
+components/              UI components
+lib/                     Client and server helpers
+shared/                  Shared types, constants, mailbox generation
+store/                   Zustand state
+scripts/                 Build scripts
+```
+
+## Quick Start
+
+1. Copy `.env.example` to `.env.local` or `.env`.
+2. Fill in your Appwrite, Mailgun, and domain values.
+3. Install dependencies:
+
+```bash
+npm install
+```
+
+4. Start the app:
+
+```bash
+npm run dev
+```
+
+5. Build the Appwrite function bundles when deploying functions:
+
+```bash
+npm run build:functions
+```
+
+## Environment Variables
+
+### Public runtime
+
+- `NEXT_PUBLIC_APPWRITE_FUNCTION_CREATE_INBOX_URL`
+- `NEXT_PUBLIC_APPWRITE_FUNCTION_GET_INBOX_URL`
+- `NEXT_PUBLIC_APPWRITE_FUNCTION_GET_EMAIL_URL`
+- `NEXT_PUBLIC_APPWRITE_FUNCTION_DELETE_INBOX_URL`
+- `NEXT_PUBLIC_INBOX_POLL_MS`
+- `NEXT_PUBLIC_RESTORE_BASE_URL`
+- `NEXT_PUBLIC_MAIL_DOMAINS`
+
+### Server runtime
+
+- `APPWRITE_API_ENDPOINT`
+- `APPWRITE_PROJECT_ID`
+- `APPWRITE_API_KEY`
+- `APPWRITE_DATABASE_ID`
+- `APPWRITE_EMAILS_COLLECTION_ID`
+- `APPWRITE_INBOXES_COLLECTION_ID`
+- `APPWRITE_ATTACHMENTS_BUCKET_ID`
+- `MAILGUN_API_KEY`
+- `MAILGUN_SIGNING_KEY`
+- `MAILGUN_BASE_URL`
+- `MAIL_DOMAINS`
+- `MAIL_INBOX_TTL_HOURS`
+- `MAIL_MAX_SIZE_BYTES`
+- `ACCESS_TOKEN_PEPPER`
+
+## Appwrite Setup
 
 ### Database
 
 Create database `temp_mail`.
 
-Create collection `emails` with attributes:
+Create collection `emails` with:
 
-- `email_address`: string, required
-- `sender`: string, required
-- `subject`: string, required
-- `body_text`: string, required
-- `body_html`: string, required
-- `attachments`: string, required
-- `received_at`: datetime, required
+- `email_address`: string
+- `sender`: string
+- `subject`: string
+- `body_text`: string
+- `body_html`: string
+- `attachments`: string
+- `received_at`: datetime
 
 Indexes:
 
 - `email_address`
 - `received_at`
-- Composite index on `email_address` + `received_at desc`
+- composite index on `email_address` + `received_at desc`
 
-Create collection `inboxes` with attributes:
+Create collection `inboxes` with:
 
-- `email_address`: string, required
-- `access_token_hash`: string, required
-- `domain`: string, required
-- `display_name`: string, required
-- `created_at`: datetime, required
-- `expires_at`: datetime, required
-- `last_seen_at`: datetime, required
+- `email_address`: string
+- `access_token_hash`: string
+- `domain`: string
+- `display_name`: string
+- `created_at`: datetime
+- `expires_at`: datetime
+- `last_seen_at`: datetime
 
 Indexes:
 
-- Unique `email_address`
+- unique `email_address`
 - `expires_at`
 
-Disable client-facing document permissions for both collections; only Appwrite Functions and the attachment proxy route need server access.
+Keep document permissions server-side only.
 
 ### Storage
 
 Create bucket `email-attachments`.
 
-- Access: server-side only
-- File size: at least 25 MB
-- Compression/antivirus: keep default Appwrite settings
+- server-side access only
+- file size at least 25 MB
 
 ### Functions
 
-Deploy each Appwrite function from the same repo root.
-
-- Install command: `bun install`
-- Build command: `bun run build:functions`
-- Runtime: Node.js 20+
-
-Entrypoints:
+Deploy these entrypoints:
 
 - `dist/appwrite/functions/create-inbox/main.js`
 - `dist/appwrite/functions/get-inbox/main.js`
@@ -81,62 +143,62 @@ Entrypoints:
 - `dist/appwrite/functions/receive-email/main.js`
 - `dist/appwrite/functions/cleanup-expired/main.js`
 
-Function env vars:
+Recommended runtime:
 
-- `APPWRITE_API_ENDPOINT`
-- `APPWRITE_PROJECT_ID`
-- `APPWRITE_DATABASE_ID`
-- `APPWRITE_EMAILS_COLLECTION_ID`
-- `APPWRITE_INBOXES_COLLECTION_ID`
-- `APPWRITE_ATTACHMENTS_BUCKET_ID`
-- `MAILGUN_SIGNING_KEY`
-- `MAIL_DOMAINS`
-- `MAIL_INBOX_TTL_HOURS`
-- `MAIL_MAX_SIZE_BYTES`
-- `NEXT_PUBLIC_RESTORE_BASE_URL`
-- `ACCESS_TOKEN_PEPPER`
+- Node.js 20+
 
-Permissions and schedule:
+Execute permissions:
 
-- `create-inbox`, `get-inbox`, `get-email`, `delete-inbox`, `receive-email`: execute permission `Any`
-- `cleanup-expired`: execute permission restricted to server/admin, scheduled hourly with cron `0 * * * *`
+- `create-inbox`, `get-inbox`, `get-email`, `delete-inbox`, `receive-email`: `Any`
+- `cleanup-expired`: restricted server/admin execution
 
-## Mailgun setup
+## Mailgun Setup
 
-### Domain onboarding
+For each receiving domain, configure the exact DNS records Mailgun provides.
 
-For each domain, add the exact DNS values shown in Mailgun to Cloudflare, including TXT verification records.
+For example, if your inbox domain is `gmail.rahil.pro`, you need Mailgun inbound MX records on `gmail.rahil.pro`, not only on `rahil.pro`.
 
-Required MX records:
+Typical required inbound records:
 
 - `MX 10 mxa.mailgun.org`
 - `MX 10 mxb.mailgun.org`
+- SPF TXT record from Mailgun
+- DKIM records from Mailgun
 
-Domains:
-- `gmail.rahil.pro`
+Create an inbound route that matches the full receiving domain and forwards to your deployed `receive-email` function URL.
 
-### Inbound routes
-
-Create one route per domain:
+Example pattern:
 
 ```text
-
-match_recipient(".*@rahil\\.pro")
-forward("https://receive-email.example.appwrite.run")
-
-
+match_recipient(".*@gmail\\.rahil\\.pro")
+forward("https://<your-receive-email-function-url>")
 ```
 
-Mailgun includes `timestamp`, `token`, and `signature`; the `receive-email` function verifies those before storing mail.
+## Security Notes
 
-## Vercel setup
+- Inbox creation is rate-limited to 3 per IP per 24 hours
+- Existing inbox lookup is limited to inboxes created within the last 24 hours
+- Lookup mode is read-only and does not expose restore tokens
+- API routes enforce request validation, body-size checks, and origin checks
+- Security headers are applied through Next.js middleware
 
-Add the public function URLs and Appwrite server env vars from `.env.example`.
+## Development
 
-The attachment proxy route uses the server-side Appwrite API key, so `APPWRITE_API_KEY` must also be available in Vercel.
+Run checks:
 
-## Notes
+```bash
+npm run build
+npm run test
+```
 
-- Generated inboxes are private by token, not public by email address.
-- Only active generated inboxes store mail; unknown recipients are accepted by Mailgun but ignored by the backend.
-- The restore link encodes the token in the URL hash so it does not travel in HTTP requests when opening the inbox page itself.
+## Open Source
+
+- [License](./LICENSE)
+- [Contributing](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security Policy](./SECURITY.md)
+
+## Author
+
+- GitHub: [@rahil1202](https://github.com/rahil1202)
+

@@ -1,15 +1,21 @@
 "use client";
 
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Copy,
+  Github,
+  Info,
+  Linkedin,
   LoaderCircle,
+  Lock,
   Mail,
+  Search,
   RefreshCcw,
   ScanLine,
-  Shield,
-  Sparkles,
+  Share2,
+  ArrowUpRight,
   Trash2
 } from "lucide-react";
 import { EmailFrame } from "@/components/email-frame";
@@ -17,7 +23,7 @@ import { functionApi, publicEnv } from "@/lib/client-api";
 import { formatRelativeTime, formatTimestamp } from "@/lib/time";
 import { useInboxStore } from "@/store/inbox-store";
 import { createRestoreUrl } from "@/shared/mailbox";
-import type { DomainPreference, InboxSession, MailDomain } from "@/shared/types";
+import type { DomainPreference, FunctionHealthStatus, InboxSession, MailDomain } from "@/shared/types";
 
 type InboxWorkspaceProps = {
   initialEmailAddress?: string;
@@ -39,20 +45,20 @@ function readHashToken() {
 function LiveIndicator({ syncStatus, lastSyncedAt }: { syncStatus: string; lastSyncedAt: string | null }) {
   const label =
     syncStatus === "creating"
-      ? "Minting inbox"
+      ? "Creating"
       : syncStatus === "syncing"
-        ? "Refreshing inbox"
+        ? "Refreshing"
         : syncStatus === "deleting"
-          ? "Deleting inbox"
+          ? "Resetting"
           : syncStatus === "error"
-            ? "Needs attention"
+            ? "Error"
             : "Live";
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-aqua-400/20 bg-aqua-500/10 px-3 py-1 text-xs text-aqua-400">
-      <span className={`h-2 w-2 rounded-full ${syncStatus === "error" ? "bg-red-400" : "bg-aqua-400"}`} />
+    <div className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/70">
+      <span className={`h-2 w-2 rounded-full ${syncStatus === "error" ? "bg-redtone-400" : "bg-green-400"}`} />
       <span>{label}</span>
-      {lastSyncedAt ? <span className="text-white/40">· {formatRelativeTime(lastSyncedAt)}</span> : null}
+      {lastSyncedAt ? <span className="text-white/35">{formatRelativeTime(lastSyncedAt)}</span> : null}
     </div>
   );
 }
@@ -66,11 +72,11 @@ function DomainSelect({
 }) {
   return (
     <label className="flex flex-col gap-2 text-sm text-white/70">
-      <span>Domain</span>
+      <span className="text-[11px] uppercase tracking-[0.2em] text-white/40">Domain</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as DomainPreference)}
-        className="h-12 rounded-2xl border border-white/10 bg-white/5 px-4 text-white outline-none transition focus:border-aqua-400/60"
+        className="h-12 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none transition focus:border-redtone-400/60"
       >
         <option value="random">Random rotation</option>
         {publicEnv.domains.map((domain) => (
@@ -105,6 +111,12 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     resetInbox
   } = useInboxStore();
   const [copied, setCopied] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [health, setHealth] = useState<FunctionHealthStatus | null>(null);
+  const [healthOpen, setHealthOpen] = useState(false);
+  const [lookupEmailAddress, setLookupEmailAddress] = useState("");
+  const [lookupMode, setLookupMode] = useState(false);
+  const [draftEmailAddress, setDraftEmailAddress] = useState("");
   const initializedRef = useRef(false);
 
   const activeEmailId = selectedEmailId ?? emails[0]?.id ?? null;
@@ -147,12 +159,16 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
   const createNewInbox = useCallback(async (preferredDomain = domainPreference) => {
     setSyncStatus("creating");
     setErrorMessage(null);
+    setLookupMode(false);
     setSelectedEmail(null);
     setSelectedEmailId(null);
 
     try {
+      const normalizedDraft = draftEmailAddress.trim().toLowerCase();
+      const currentEmail = session?.emailAddress?.trim().toLowerCase() ?? "";
       const result = await functionApi.createInbox({
-        preferredDomain
+        preferredDomain,
+        customEmailAddress: normalizedDraft && normalizedDraft !== currentEmail ? normalizedDraft : undefined
       });
 
       const nextSession = {
@@ -163,12 +179,13 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
       setSession(nextSession);
       setEmails([]);
       setLastSyncedAt(null);
+      setDraftEmailAddress(result.emailAddress);
       await syncInbox(nextSession, false);
     } catch (error) {
       setSyncStatus("error");
       setErrorMessage(error instanceof Error ? error.message : "Unable to create inbox");
     }
-  }, [domainPreference, setEmails, setErrorMessage, setLastSyncedAt, setSelectedEmail, setSelectedEmailId, setSession, setSyncStatus, syncInbox]);
+  }, [domainPreference, draftEmailAddress, session?.emailAddress, setEmails, setErrorMessage, setLastSyncedAt, setSelectedEmail, setSelectedEmailId, setSession, setSyncStatus, syncInbox]);
 
   const restoreSession = useCallback(async (emailAddress: string, accessToken: string) => {
     const currentSession: InboxSession = {
@@ -181,6 +198,8 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     };
 
     setSession(currentSession);
+    setLookupMode(false);
+    setDraftEmailAddress(emailAddress);
     await syncInbox(currentSession);
   }, [setSession, syncInbox]);
 
@@ -213,6 +232,50 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     window.setTimeout(() => setCopied(false), 1200);
   }
 
+  async function copyRestoreUrl() {
+    if (!restoreUrl) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(restoreUrl);
+  }
+
+  async function openTypedInbox() {
+    if (!lookupEmailAddress.trim()) {
+      setErrorMessage("Enter an inbox email address");
+      return;
+    }
+
+    setSyncStatus("syncing");
+    setErrorMessage(null);
+    setSelectedEmail(null);
+    setSelectedEmailId(null);
+
+    try {
+      const result = await functionApi.lookupInbox({
+        emailAddress: lookupEmailAddress.trim()
+      });
+
+      setLookupMode(true);
+      setSession({
+        emailAddress: result.session.emailAddress,
+        accessToken: "",
+        expiresAt: result.session.expiresAt,
+        domain: result.session.domain as MailDomain,
+        restoreUrl: "",
+        displayName: result.session.displayName
+      });
+      setEmails(result.emails);
+      setDraftEmailAddress(result.session.emailAddress);
+      setLastSyncedAt(new Date().toISOString());
+      setSyncStatus("ready");
+    } catch (error) {
+      setLookupMode(false);
+      setSyncStatus("error");
+      setErrorMessage(error instanceof Error ? error.message : "Unable to open inbox");
+    }
+  }
+
   useEffect(() => {
     if (!hydrated || initializedRef.current) {
       return;
@@ -235,7 +298,7 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
   }, [createNewInbox, domainPreference, hydrated, initialEmailAddress, restoreSession, session, syncInbox]);
 
   useEffect(() => {
-    if (!session || syncStatus === "creating" || syncStatus === "deleting") {
+    if (!session || lookupMode || syncStatus === "creating" || syncStatus === "deleting") {
       return;
     }
 
@@ -246,7 +309,7 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     return () => {
       window.clearInterval(interval);
     };
-  }, [session, syncStatus, syncInbox]);
+  }, [lookupMode, session, syncStatus, syncInbox]);
 
   useEffect(() => {
     if (!session || !activeEmailId) {
@@ -258,12 +321,18 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     }
 
     startTransition(() => {
-      void functionApi
-        .getEmail({
-          emailId: activeEmailId,
-          emailAddress: session.emailAddress,
-          accessToken: session.accessToken
-        })
+      const request = lookupMode
+        ? functionApi.lookupEmail({
+            emailId: activeEmailId,
+            emailAddress: session.emailAddress
+          })
+        : functionApi.getEmail({
+            emailId: activeEmailId,
+            emailAddress: session.emailAddress,
+            accessToken: session.accessToken
+          });
+
+      void request
         .then((result) => {
           setSelectedEmail(result.email);
           setErrorMessage(null);
@@ -272,135 +341,191 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
           setErrorMessage(error instanceof Error ? error.message : "Unable to load email");
         });
     });
-  }, [activeEmailId, session, selectedEmail, setSelectedEmail, setErrorMessage]);
+  }, [activeEmailId, lookupMode, session, selectedEmail, setSelectedEmail, setErrorMessage]);
+
+  useEffect(() => {
+    void functionApi.getHealth().then(setHealth).catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    if (session?.emailAddress) {
+      setDraftEmailAddress(session.emailAddress);
+    }
+  }, [session?.emailAddress]);
 
   const attachments = selectedEmail?.attachments ?? [];
 
   return (
-    <main className="min-h-screen bg-hero-grid px-4 py-6 sm:px-6 lg:px-10">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-7xl flex-col gap-6">
-        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,138,61,0.14),transparent_35%),linear-gradient(180deg,rgba(11,31,40,0.94),rgba(4,19,26,0.94))] p-6 shadow-panel sm:p-8">
-          <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
-            <div className="space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/60">
-                <Sparkles className="h-3.5 w-3.5 text-flare-400" />
-                Appwrite + Mailgun temp mail
-              </div>
-              <div className="space-y-3">
-                <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Temporary inboxes with human-style addresses, zero signup, and private restore links.
-                </h1>
-                <p className="max-w-2xl text-base text-white/65 sm:text-lg">
-                  Generate a realistic address, watch it refresh every five seconds, and open HTML emails inside a
-                  locked-down viewer.
-                </p>
-              </div>
-              <div className="grid gap-4 rounded-[1.75rem] border border-aqua-400/15 bg-white/5 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <LiveIndicator syncStatus={syncStatus} lastSyncedAt={lastSyncedAt} />
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs text-white/50">
-                      <Shield className="h-3.5 w-3.5 text-aqua-400" />
-                      Private via access token
-                    </div>
-                  </div>
-                  <div className="rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-4">
-                    <p className="mb-2 text-xs uppercase tracking-[0.22em] text-white/45">Active inbox</p>
-                    <div className="break-all font-[family-name:var(--font-mono)] text-xl text-aqua-400 sm:text-2xl">
-                      {session?.emailAddress ?? "Generating inbox..."}
-                    </div>
-                    <p className="mt-2 text-sm text-white/45">
-                      {session ? `Expires ${formatTimestamp(session.expiresAt)}` : "Reserving an address and access token."}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:min-w-56">
-                  <DomainSelect value={domainPreference} onChange={setDomainPreference} />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={copyEmailAddress}
-                      disabled={!session}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-aqua-400/25 bg-aqua-500/15 px-4 text-sm font-medium text-aqua-100 transition hover:border-aqua-400/50 hover:bg-aqua-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Copy className="h-4 w-4" />
-                      {copied ? "Copied" : "Copy"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void createNewInbox(domainPreference)}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-flare-400/30 bg-flare-500/15 px-4 text-sm font-medium text-flare-100 transition hover:border-flare-400/60 hover:bg-flare-500/20"
-                    >
-                      {syncStatus === "creating" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                      Generate new
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {errorMessage ? (
-                <div className="rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{errorMessage}</div>
-              ) : null}
-            </div>
+    <main className="relative min-h-screen overflow-hidden px-4 py-4 sm:px-6 lg:px-10">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-[-20%] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(88,8,14,0.08),rgba(182,29,34,0.22),rgba(58,6,10,0.1),rgba(217,46,52,0.2),rgba(88,8,14,0.08))] blur-3xl animate-[redFlow_30s_linear_infinite]" />
+        <div className="absolute -left-[14%] top-[-22%] h-[38rem] w-[38rem] rounded-full bg-[radial-gradient(circle,rgba(182,29,34,0.44),rgba(182,29,34,0.14)_42%,transparent_70%)] blur-3xl animate-[redDrift_18s_ease-in-out_infinite]" />
+        <div className="absolute right-[-12%] top-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(217,46,52,0.34),rgba(125,20,24,0.12)_48%,transparent_72%)] blur-3xl animate-[redFlow_26s_ease-in-out_infinite_reverse]" />
+        <div className="absolute bottom-[-24%] left-[12%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(125,20,24,0.34),rgba(182,29,34,0.1)_42%,transparent_70%)] blur-3xl animate-[redDrift_22s_ease-in-out_infinite]" />
+        <div className="absolute bottom-[-18%] right-[10%] h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,rgba(143,16,22,0.3),rgba(90,10,16,0.08)_44%,transparent_70%)] blur-3xl animate-[redFlow_34s_ease-in-out_infinite]" />
+      </div>
 
-            <div className="rounded-[1.75rem] border border-white/10 bg-black/15 p-5">
-              <div className="mb-4 flex items-center gap-2 text-sm text-white/60">
-                <ScanLine className="h-4 w-4 text-aqua-400" />
-                Restore on another device
-              </div>
-              <div className="flex flex-col items-center gap-4 rounded-[1.5rem] border border-dashed border-white/15 bg-ink-950/70 px-4 py-5">
-                {restoreUrl ? (
-                  <QRCodeSVG
-                    value={restoreUrl}
-                    size={164}
-                    bgColor="transparent"
-                    fgColor="#d7f2f5"
-                    includeMargin={false}
-                  />
-                ) : (
-                  <div className="flex h-[164px] w-[164px] items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-white/35">
-                    Preparing
-                  </div>
-                )}
-                <p className="text-center text-sm text-white/55">
-                  The restore URL keeps the inbox private by carrying the token in the URL hash.
-                </p>
-                {restoreUrl ? (
-                  <a
-                    href={restoreUrl}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-white/80 transition hover:border-aqua-400/40 hover:text-white"
-                  >
-                    Open restore link
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid flex-1 gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <aside className="flex min-h-[32rem] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[rgba(10,31,40,0.82)] shadow-panel">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+      <div className="relative mx-auto grid h-[calc(100vh-2rem)] max-w-7xl grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
+        <header className="glass-panel rounded-[1.75rem] border border-white/10 px-4 py-3 shadow-panel sm:px-5 sm:py-4">
+          <div className="flex h-full flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/40">Inbox stream</p>
-                <h2 className="mt-1 text-lg text-white">Latest emails</h2>
+                <p className="text-[11px] uppercase tracking-[0.34em] text-white/34">Temp Mail</p>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <LiveIndicator syncStatus={syncStatus} lastSyncedAt={lastSyncedAt} />
+                <button
+                  type="button"
+                  onClick={() => setHealthOpen((current) => !current)}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-white/80 transition hover:border-redtone-400/35 hover:bg-redtone-500/10 hover:text-white"
+                >
+                  <Info className="h-4 w-4" />
+                  Health
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-white/80 transition hover:border-redtone-400/35 hover:bg-redtone-500/10 hover:text-white"
+                >
+                  <Share2 className="h-4 w-4" />
+                    Share
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
+              <div className="glass-soft min-w-0 rounded-[1.25rem] border border-white/10 px-4 py-3">
+                <input
+                  type="text"
+                  value={draftEmailAddress}
+                  onChange={(event) => setDraftEmailAddress(event.target.value)}
+                  placeholder={publicEnv.domains[0] ? `name@${publicEnv.domains[0]}` : "name@example.com"}
+                  className="w-full bg-transparent font-[family-name:var(--font-mono)] text-sm text-white outline-none placeholder:text-white/28 sm:text-lg"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                />
+              </div>
+
+              <div className="min-w-[13rem]">
+                <DomainSelect value={domainPreference} onChange={setDomainPreference} />
+              </div>
+
+              <div className="glass-soft flex min-w-[16rem] items-center gap-2 rounded-[1.25rem] border border-white/10 px-3 py-2">
+                <Search className="h-4 w-4 text-white/40" />
+                <input
+                  type="email"
+                  value={lookupEmailAddress}
+                  onChange={(event) => setLookupEmailAddress(event.target.value)}
+                  placeholder="Open existing inbox"
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/28"
+                />
+                <button
+                  type="button"
+                  onClick={() => void openTypedInbox()}
+                  className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 px-3 text-xs uppercase tracking-[0.18em] text-white/75 transition hover:border-white/20 hover:text-white"
+                >
+                  Open
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => void deleteActiveInbox()}
-                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 px-3 text-sm text-white/65 transition hover:border-red-400/40 hover:text-red-200"
+                onClick={copyEmailAddress}
+                disabled={!session}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-white px-5 text-sm font-medium text-black transition hover:bg-[#f3eaea] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Trash2 className="h-4 w-4" />
-                Reset inbox
+                <Copy className="h-4 w-4" />
+                {copied ? "Copied" : "Copy"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void createNewInbox(domainPreference)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-redtone-400/40 bg-redtone-500/20 px-5 text-sm font-medium text-white transition hover:bg-redtone-500/30"
+              >
+                {syncStatus === "creating" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                New
               </button>
             </div>
 
-            <div className="mail-scrollbar flex-1 overflow-y-auto p-3">
-              {emails.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.03] px-6 text-center">
-                  <Mail className="h-10 w-10 text-white/25" />
+            {errorMessage ? (
+              <div className="rounded-[1.1rem] border border-redtone-400/30 bg-redtone-500/10 px-4 py-2.5 text-sm text-white">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            {healthOpen && health ? (
+              <div className="rounded-[1.1rem] border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/72">
+                <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
                   <div className="space-y-1">
-                    <p className="text-white/70">Inbox is waiting for mail.</p>
-                    <p className="text-sm text-white/40">Send something to the address above and it will appear here.</p>
+                    <p className="uppercase tracking-[0.18em] text-white/35">Proxy URLs</p>
+                    <p>Create: {health.createInboxUrl || "missing"}</p>
+                    <p>Inbox: {health.getInboxUrl || "missing"}</p>
+                    <p>Email: {health.getEmailUrl || "missing"}</p>
+                    <p>Delete: {health.deleteInboxUrl || "missing"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="uppercase tracking-[0.18em] text-white/35">Server Config</p>
+                    <p>API endpoint: {health.apiEndpointConfigured ? "ok" : "missing"}</p>
+                    <p>Project: {health.projectConfigured ? "ok" : "missing"}</p>
+                    <p>API key: {health.apiKeyConfigured ? "ok" : "missing"}</p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1">
+                  <p className="uppercase tracking-[0.18em] text-white/35">Functions</p>
+                  {health.functionStatuses.map((item) => (
+                    <p key={item.id}>
+                      {item.id}: {item.enabled ? "enabled" : "disabled"}, {item.live ? "live" : "not live"}, deployment {item.deploymentStatus ?? "unknown"}
+                    </p>
+                  ))}
+                  <p>Daily new inbox limit per IP: 3</p>
+                  <p>Custom inbox rule: supported domain only, safe characters only, max 32 chars before @.</p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </header>
+
+        <section className="grid min-h-0 max-h-full gap-4 lg:grid-cols-[0.82fr_1.18fr]">
+          <aside className="glass-panel flex min-h-0 max-h-full flex-col overflow-hidden rounded-[2rem] border border-white/10 shadow-panel">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.26em] text-white/36">Inbox</p>
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-2xl text-white">Mail</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (session) {
+                      void syncInbox(session);
+                    }
+                  }}
+                  disabled={!session || syncStatus === "creating" || syncStatus === "deleting"}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-white/70 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label="Refresh inbox"
+                >
+                  <RefreshCcw className={`h-4 w-4 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteActiveInbox()}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-white/70 transition hover:border-redtone-400/40 hover:bg-redtone-500/10 hover:text-white"
+                  aria-label="Reset inbox"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mail-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
+              {emails.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.02] px-6 text-center">
+                  <Mail className="h-10 w-10 text-white/20" />
+                  <div className="space-y-1">
+                    <p className="text-white/72">Waiting.</p>
+                    <p className="text-sm text-white/38">Send mail to the address above.</p>
                   </div>
                 </div>
               ) : (
@@ -418,22 +543,26 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                         }}
                         className={`w-full rounded-[1.5rem] border p-4 text-left transition ${
                           selected
-                            ? "border-aqua-400/45 bg-aqua-500/10"
-                            : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
+                            ? "border-redtone-400/45 bg-[linear-gradient(135deg,rgba(182,29,34,0.18),rgba(255,255,255,0.03))]"
+                            : "border-white/8 bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.04]"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
-                            <p className="truncate text-sm text-aqua-300">{email.sender}</p>
-                            <p className="mt-1 truncate text-base text-white">{email.subject}</p>
+                            <p className="truncate text-[11px] uppercase tracking-[0.18em] text-white/38">{email.sender}</p>
+                            <p className="mt-2 truncate text-base text-white">{email.subject}</p>
                           </div>
-                          {email.hasAttachments ? (
-                            <span className="rounded-full border border-flare-400/30 bg-flare-500/10 px-2 py-1 text-[11px] uppercase tracking-[0.2em] text-flare-200">
-                              Files
+                          {lookupMode ? (
+                            <span className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white/42">
+                              Last 24h
+                            </span>
+                          ) : email.hasAttachments ? (
+                            <span className="rounded-full border border-redtone-400/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-redtone-300">
+                              File
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-3 text-xs text-white/40">{formatTimestamp(email.receivedAt)}</p>
+                        <p className="mt-4 text-xs text-white/32">{formatTimestamp(email.receivedAt)}</p>
                       </button>
                     );
                   })}
@@ -442,33 +571,42 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
             </div>
           </aside>
 
-          <section className="min-h-[32rem] rounded-[2rem] border border-white/10 bg-[rgba(7,28,36,0.85)] p-5 shadow-panel">
+          <section className="glass-panel min-h-0 max-h-full rounded-[2rem] border border-white/10 p-4 shadow-panel sm:p-5">
             {selectedEmail ? (
-              <div className="flex h-full flex-col gap-5">
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-aqua-300">{selectedEmail.sender}</p>
-                      <h3 className="mt-1 text-2xl text-white">{selectedEmail.subject}</h3>
+              <div className="flex h-full min-h-0 flex-col gap-4">
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.025] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] uppercase tracking-[0.2em] text-white/38">{selectedEmail.sender}</p>
+                      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl leading-tight text-white sm:text-3xl">
+                        {selectedEmail.subject}
+                      </h3>
                     </div>
-                    <div className="text-sm text-white/45">{formatTimestamp(selectedEmail.receivedAt)}</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/30">{formatTimestamp(selectedEmail.receivedAt)}</div>
                   </div>
                 </div>
 
-                <EmailFrame bodyHtml={selectedEmail.bodyHtml} />
+                <div className="min-h-0 flex-1">
+                  <EmailFrame bodyHtml={selectedEmail.bodyHtml} />
+                </div>
 
-                <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
-                    <p className="mb-3 text-xs uppercase tracking-[0.18em] text-white/45">Plain text</p>
-                    <pre className="mail-scrollbar max-h-48 overflow-auto whitespace-pre-wrap font-[family-name:var(--font-mono)] text-sm text-white/70">
+                <div className="grid gap-4 lg:grid-cols-[1fr_0.82fr]">
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.025] p-4">
+                    <p className="mb-3 text-[11px] uppercase tracking-[0.24em] text-white/35">Text</p>
+                    <pre className="mail-scrollbar max-h-48 overflow-auto whitespace-pre-wrap font-[family-name:var(--font-mono)] text-sm text-white/68">
                       {selectedEmail.bodyText || "No plain text body provided."}
                     </pre>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
-                    <p className="mb-3 text-xs uppercase tracking-[0.18em] text-white/45">Attachments</p>
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.025] p-4">
+                    <p className="mb-3 text-[11px] uppercase tracking-[0.24em] text-white/35">Files</p>
                     {attachments.length === 0 ? (
-                      <p className="text-sm text-white/45">No attachments.</p>
+                      <p className="text-sm text-white/40">None</p>
+                    ) : lookupMode ? (
+                      <div className="flex items-center gap-2 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/65">
+                        <Lock className="h-4 w-4" />
+                        Attachments are hidden in email-only lookup mode.
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         {attachments.map((attachment) => (
@@ -479,10 +617,10 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                             )}&emailAddress=${encodeURIComponent(selectedEmail.emailAddress)}&accessToken=${encodeURIComponent(
                               session?.accessToken ?? ""
                             )}`}
-                            className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 transition hover:border-aqua-400/35 hover:text-white"
+                            className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-[#0b0b0b] px-4 py-3 text-sm text-white/82 transition hover:border-redtone-400/35 hover:bg-redtone-500/10 hover:text-white"
                           >
                             <span className="truncate">{attachment.filename}</span>
-                            <span className="text-xs text-white/40">{Math.ceil(attachment.size / 1024)} KB</span>
+                            <span className="text-xs text-white/35">{Math.ceil(attachment.size / 1024)} KB</span>
                           </a>
                         ))}
                       </div>
@@ -491,17 +629,110 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                 </div>
               </div>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.03] text-center">
-                <Mail className="h-12 w-12 text-white/25" />
+              <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.02] text-center">
+                <Mail className="h-12 w-12 text-white/20" />
                 <div className="space-y-1">
-                  <p className="text-lg text-white/75">Select an email to open it.</p>
-                  <p className="text-sm text-white/40">HTML content will render inside a sandboxed iframe.</p>
+                  <p className="font-[family-name:var(--font-heading)] text-3xl text-white">Open one.</p>
+                  <p className="text-sm text-white/38">Mail appears here.</p>
                 </div>
               </div>
             )}
           </section>
         </section>
+
+        <footer className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/48">
+            <Link href="/privacy-policy" className="transition hover:text-white">Privacy Policy</Link>
+            <Link href="/contact-us" className="transition hover:text-white">Contact Us</Link>
+            <Link href="/terms" className="transition hover:text-white">Terms</Link>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href="https://x.com/rahil1202"
+              aria-label="X"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-white/68 transition hover:border-redtone-400/40 hover:text-white"
+            >
+              <span className="text-xs font-medium">X</span>
+            </a>
+            <a
+              href="https://linkedin.com/in/rahil-vahora"
+              aria-label="LinkedIn"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-white/68 transition hover:border-redtone-400/40 hover:text-white"
+            >
+              <Linkedin className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="https://github.com/rahil1202/temp-email-service"
+              aria-label="GitHub"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-white/68 transition hover:border-redtone-400/40 hover:text-white"
+            >
+              <Github className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </footer>
       </div>
+
+      {modalOpen ? (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm">
+          <div className="glass-panel w-full max-w-md rounded-[2rem] border border-white/10 p-5 shadow-panel">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.26em] text-white/34">Restore</p>
+                <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl text-white">Share inbox.</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 transition hover:border-redtone-400/40 hover:text-white"
+                aria-label="Close restore modal"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+
+            <div className="mt-5 flex flex-col items-center gap-4 rounded-[1.5rem] border border-dashed border-white/12 bg-[#090909] px-4 py-5">
+              {restoreUrl ? (
+                <>
+                  <div className="rounded-[1.5rem] bg-white p-3">
+                    <QRCodeSVG value={restoreUrl} size={156} bgColor="transparent" fgColor="#111111" includeMargin={false} />
+                  </div>
+                  <div className="w-full rounded-[1.25rem] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/72">
+                    <div className="truncate">{restoreUrl}</div>
+                  </div>
+                  <div className="grid w-full gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => void copyRestoreUrl()}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-white/10 bg-white px-4 text-sm font-medium text-black transition hover:bg-[#f3eaea]"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </button>
+                    <a
+                      href={restoreUrl}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-redtone-400/40 bg-redtone-500/20 px-4 text-sm font-medium text-white transition hover:bg-redtone-500/30"
+                    >
+                      Open
+                      <ArrowUpRight className="h-4 w-4" />
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-[180px] w-[180px] items-center justify-center rounded-[1.5rem] border border-white/10 bg-white/[0.03] text-sm text-white/35">
+                  Preparing
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

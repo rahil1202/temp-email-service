@@ -7,5 +7,8 @@ export const functionApi = createFunctionApi({
   createInboxUrl: publicEnv.createInboxUrl,
   getInboxUrl: publicEnv.getInboxUrl,
   getEmailUrl: publicEnv.getEmailUrl,
-  deleteInboxUrl: publicEnv.deleteInboxUrl
+  deleteInboxUrl: publicEnv.deleteInboxUrl,
+  healthUrl: "/api/functions/health",
+  lookupInboxUrl: "/api/inbox/lookup",
+  lookupEmailUrl: "/api/email/lookup"
 });

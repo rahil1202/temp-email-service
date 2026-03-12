@@ -1,6 +1,7 @@
 import { Client, Databases, Query, Storage } from "node-appwrite";
 import { isAccessTokenValid } from "@/appwrite/functions/_shared/security";
 import type { EmailDocument, InboxDocument } from "@/appwrite/functions/_shared/types";
+import { LOOKUP_WINDOW_HOURS } from "@/shared/constants";
 
 function requireValue(name: string) {
   const value = process.env[name];
@@ -89,4 +90,48 @@ export async function getAuthorizedEmail({
   }
 
   return { ...ownership, email };
+}
+
+export async function getLookupInbox(emailAddress: string) {
+  const admin = createAdminAppwrite();
+  const now = Date.now();
+  const cutoffIso = new Date(now - LOOKUP_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+  const inboxes = await admin.databases.listDocuments<InboxDocument>(admin.databaseId, admin.inboxesCollectionId, [
+    Query.equal("email_address", emailAddress),
+    Query.greaterThanEqual("expires_at", cutoffIso),
+    Query.limit(1)
+  ]);
+
+  return { admin, inbox: inboxes.documents[0] ?? null };
+}
+
+export async function listLookupInboxEmails(emailAddress: string) {
+  const { admin, inbox } = await getLookupInbox(emailAddress);
+  if (!inbox) {
+    return null;
+  }
+
+  const cutoffIso = new Date(Date.now() - LOOKUP_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+  const emails = await admin.databases.listDocuments<EmailDocument>(admin.databaseId, admin.emailsCollectionId, [
+    Query.equal("email_address", emailAddress),
+    Query.greaterThanEqual("received_at", cutoffIso),
+    Query.orderDesc("received_at"),
+    Query.limit(100)
+  ]);
+
+  return { admin, inbox, emails: emails.documents };
+}
+
+export async function getLookupEmail(emailAddress: string, emailId: string) {
+  const listed = await listLookupInboxEmails(emailAddress);
+  if (!listed) {
+    return null;
+  }
+
+  const email = listed.emails.find((item) => item.$id === emailId);
+  if (!email) {
+    return null;
+  }
+
+  return { ...listed, email };
 }

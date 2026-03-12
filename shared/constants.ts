@@ -12,7 +12,27 @@ export const INDIAN_FIRST_NAMES = [
   "Aditya",
   "Aryan",
   "Krishna",
-  "Vihaan"
+  "Vihaan",
+  "Atharv",
+  "Dhruv",
+  "Reyansh",
+  "Shaurya",
+  "Laksh",
+  "Ayaan",
+  "Parth",
+  "Yash",
+  "Rudra",
+  "Dev",
+  "Anaya",
+  "Diya",
+  "Saanvi",
+  "Myra",
+  "Kiara",
+  "Aadhya",
+  "Anika",
+  "Riya",
+  "Ira",
+  "Navya"
 ] as const;
 
 export const INDIAN_SURNAMES = [
@@ -25,7 +45,21 @@ export const INDIAN_SURNAMES = [
   "Shah",
   "Joshi",
   "Kapoor",
-  "Malhotra"
+  "Malhotra",
+  "Agarwal",
+  "Bansal",
+  "Chopra",
+  "Saxena",
+  "Khanna",
+  "Nair",
+  "Iyer",
+  "Reddy",
+  "Rao",
+  "Chaudhary",
+  "Trivedi",
+  "Bose",
+  "Desai",
+  "Mishra"
 ] as const;
 
 export const WESTERN_FIRST_NAMES = [
@@ -50,6 +84,21 @@ export const WESTERN_FIRST_NAMES = [
   "Harper",
   "Evelyn",
   "Abigail",
+  "Ella",
+  "Scarlett",
+  "Grace",
+  "Luna",
+  "Chloe",
+  "Logan",
+  "Mason",
+  "Elijah",
+  "Daniel",
+  "Sebastian",
+  "Jack",
+  "Levi",
+  "Owen",
+  "Samuel",
+  "Mateo"
 ] as const;
 
 export const WESTERN_SURNAMES = [
@@ -72,9 +121,26 @@ export const WESTERN_SURNAMES = [
   "Lopez",
   "Gonzalez",
   "Perez",
-  "Sanchez", 
+  "Sanchez",
+  "Clark",
+  "Lewis",
+  "Walker",
+  "Hall",
+  "Allen",
+  "Young",
+  "King",
+  "Wright",
+  "Scott",
+  "Green",
+  "Baker",
+  "Adams",
+  "Nelson",
+  "Carter"
 ] as const;
 
 export const INBOX_TTL_HOURS = 24;
 export const POLL_INTERVAL_MS = 5_000;
 export const MAX_MESSAGE_SIZE_BYTES = 25 * 1024 * 1024;
+export const DAILY_CREATE_LIMIT_PER_IP = 3;
+export const LOOKUP_WINDOW_HOURS = 24;
+export const MAX_API_BODY_BYTES = 8 * 1024;
