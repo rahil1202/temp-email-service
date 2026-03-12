@@ -1,0 +1,13 @@
+.next
+dist
+node_modules
+.turbo
+.vercel
+.env
+.env.local
+.env.production
+coverage
+playwright-report
+test-results
+*.log
+tmp
