@@ -32,21 +32,30 @@ function pickNamePool(random: RandomSource) {
 }
 
 export function resolveDomain(preferredDomain?: DomainPreference, random: RandomSource = defaultRandom): MailDomain {
+  return resolveDomainFromList(DEFAULT_MAIL_DOMAINS, preferredDomain, random);
+}
+
+export function resolveDomainFromList(
+  allowedDomains: readonly MailDomain[],
+  preferredDomain?: DomainPreference,
+  random: RandomSource = defaultRandom
+): MailDomain {
   if (preferredDomain && preferredDomain !== "random") {
     return preferredDomain;
   }
 
-  return sample(DEFAULT_MAIL_DOMAINS, random);
+  return sample(allowedDomains, random);
 }
 
 export function createMailboxIdentity(
   preferredDomain?: DomainPreference,
+  allowedDomains: readonly MailDomain[] = DEFAULT_MAIL_DOMAINS,
   random: RandomSource = defaultRandom
 ): GeneratedMailboxIdentity {
   const { firstNames, surnames } = pickNamePool(random);
   const firstName = sample(firstNames, random);
   const surname = sample(surnames, random);
-  const domain = resolveDomain(preferredDomain, random);
+  const domain = resolveDomainFromList(allowedDomains, preferredDomain, random);
   const localPartBase = `${firstName}.${surname}`.toLowerCase();
 
   return {

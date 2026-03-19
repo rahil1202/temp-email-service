@@ -84,7 +84,7 @@ export async function createInbox(
   }
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const identity = createMailboxIdentity(preferredDomain);
+    const identity = createMailboxIdentity(preferredDomain, services.env.domains);
     const localPart = attempt === 0 ? identity.localPartBase : withCollisionSuffix(identity.localPartBase, 10 + attempt);
     const emailAddress = `${localPart}@${identity.domain}`;
     const existingInbox = await services.findInboxByEmail(emailAddress);

@@ -68,6 +68,7 @@ npm run build:functions
 - `NEXT_PUBLIC_INBOX_POLL_MS`
 - `NEXT_PUBLIC_RESTORE_BASE_URL`
 - `NEXT_PUBLIC_MAIL_DOMAINS`
+- `APPWRITE_FUNCTION_RECEIVE_EMAIL_URL` (optional, used by the health UI)
 
 ### Server runtime
 
@@ -201,4 +202,3 @@ npm run test
 ## Author
 
 - GitHub: [@rahil1202](https://github.com/rahil1202)
-

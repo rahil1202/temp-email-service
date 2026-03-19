@@ -464,6 +464,7 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                     <p>Inbox: {health.getInboxUrl || "missing"}</p>
                     <p>Email: {health.getEmailUrl || "missing"}</p>
                     <p>Delete: {health.deleteInboxUrl || "missing"}</p>
+                    <p>Receive: {health.receiveEmailUrl || "missing"}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="uppercase tracking-[0.18em] text-white/35">Server Config</p>

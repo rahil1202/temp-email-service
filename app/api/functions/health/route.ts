@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const FUNCTION_IDS = ["create-inbox", "get-inbox", "get-email", "delete-inbox"];
+const FUNCTION_IDS = ["create-inbox", "get-inbox", "get-email", "delete-inbox", "receive-email"];
 
 export async function GET() {
   const apiEndpoint = process.env.APPWRITE_API_ENDPOINT;
@@ -12,6 +12,7 @@ export async function GET() {
     getInboxUrl: process.env.NEXT_PUBLIC_APPWRITE_FUNCTION_GET_INBOX_URL ?? "",
     getEmailUrl: process.env.NEXT_PUBLIC_APPWRITE_FUNCTION_GET_EMAIL_URL ?? "",
     deleteInboxUrl: process.env.NEXT_PUBLIC_APPWRITE_FUNCTION_DELETE_INBOX_URL ?? "",
+    receiveEmailUrl: process.env.APPWRITE_FUNCTION_RECEIVE_EMAIL_URL ?? "",
     apiEndpointConfigured: Boolean(apiEndpoint),
     projectConfigured: Boolean(projectId),
     apiKeyConfigured: Boolean(apiKey),

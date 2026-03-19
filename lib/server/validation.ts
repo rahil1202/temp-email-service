@@ -1,7 +1,7 @@
 import { MAX_API_BODY_BYTES } from "@/shared/constants";
-import { DEFAULT_MAIL_DOMAINS } from "@/shared/constants";
 import { normalizeEmailAddress, parseManagedEmailAddress } from "@/shared/mailbox";
-import type { CreateInboxInput, DeleteInboxInput, GetEmailInput, GetInboxInput } from "@/shared/types";
+import type { CreateInboxInput, DeleteInboxInput, GetEmailInput, GetInboxInput, MailDomain } from "@/shared/types";
+import { getPublicEnv } from "@/lib/env";
 
 const EMAIL_PATTERN = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{1,127}$/;
@@ -55,9 +55,18 @@ export function parseCreateInboxInput(body: unknown): CreateInboxInput {
   const data = requireObject(body);
   const preferredDomain = data.preferredDomain;
   const customEmailAddress = data.customEmailAddress;
+  const allowedDomains = getPublicEnv().domains as readonly MailDomain[];
 
   if (preferredDomain !== undefined && preferredDomain !== "random" && typeof preferredDomain !== "string") {
     throw new Error("Invalid preferred domain");
+  }
+
+  if (
+    typeof preferredDomain === "string" &&
+    preferredDomain !== "random" &&
+    !allowedDomains.includes(preferredDomain)
+  ) {
+    throw new Error("Unsupported preferred domain");
   }
 
   if (customEmailAddress !== undefined) {
@@ -65,7 +74,7 @@ export function parseCreateInboxInput(body: unknown): CreateInboxInput {
       throw new Error("Invalid custom email address");
     }
 
-    parseManagedEmailAddress(customEmailAddress, DEFAULT_MAIL_DOMAINS);
+    parseManagedEmailAddress(customEmailAddress, allowedDomains);
   }
 
   return {

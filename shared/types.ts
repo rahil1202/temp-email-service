@@ -1,4 +1,4 @@
-export type MailDomain = "gmail.rahil.pro" ;
+export type MailDomain = string;
 
 export type DomainPreference = MailDomain | "random";
 
@@ -84,6 +84,7 @@ export type FunctionHealthStatus = {
   getInboxUrl: string;
   getEmailUrl: string;
   deleteInboxUrl: string;
+  receiveEmailUrl: string;
   apiEndpointConfigured: boolean;
   projectConfigured: boolean;
   apiKeyConfigured: boolean;
