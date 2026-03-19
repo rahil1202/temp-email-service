@@ -29,6 +29,11 @@ type InboxWorkspaceProps = {
   initialEmailAddress?: string;
 };
 
+type ToastState = {
+  id: number;
+  message: string;
+};
+
 function splitEmailAddress(emailAddress: string) {
   const normalized = emailAddress.trim().toLowerCase();
   const [localPart = "", domain = ""] = normalized.split("@");
@@ -123,7 +128,9 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
   const [lookupEmailAddress, setLookupEmailAddress] = useState("");
   const [lookupMode, setLookupMode] = useState(false);
   const [draftEmailAddress, setDraftEmailAddress] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const initializedRef = useRef(false);
+  const toastTimeoutRef = useRef<number | null>(null);
 
   const activeEmailId = selectedEmailId ?? emails[0]?.id ?? null;
   const sessionDomain = session?.emailAddress ? splitEmailAddress(session.emailAddress).domain : session?.domain ?? "";
@@ -140,6 +147,18 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
 
     return createRestoreUrl(publicEnv.restoreBaseUrl, session.emailAddress, session.accessToken);
   }, [session]);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+
+    const id = Date.now();
+    setToast({ id, message });
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast((current) => (current?.id === id ? null : current));
+    }, 1800);
+  }, []);
 
   const syncInbox = useCallback(async (activeSession: InboxSession, shouldMarkStatus = true) => {
     try {
@@ -195,12 +214,13 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
       setEmails([]);
       setLastSyncedAt(null);
       setDraftEmailAddress(result.emailAddress);
+      showToast("Fetched new email");
       await syncInbox(nextSession, false);
     } catch (error) {
       setSyncStatus("error");
       setErrorMessage(error instanceof Error ? error.message : "Unable to create inbox");
     }
-  }, [domainPreference, draftEmailAddress, session?.domain, session?.emailAddress, setEmails, setErrorMessage, setLastSyncedAt, setSelectedEmail, setSelectedEmailId, setSession, setSyncStatus, syncInbox]);
+  }, [domainPreference, draftEmailAddress, session?.domain, session?.emailAddress, setEmails, setErrorMessage, setLastSyncedAt, setSelectedEmail, setSelectedEmailId, setSession, setSyncStatus, showToast, syncInbox]);
 
   const restoreSession = useCallback(async (emailAddress: string, accessToken: string) => {
     const currentSession: InboxSession = {
@@ -244,6 +264,7 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
 
     await navigator.clipboard.writeText(session.emailAddress);
     setCopied(true);
+    showToast("Copied email");
     window.setTimeout(() => setCopied(false), 1200);
   }
 
@@ -253,6 +274,18 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     }
 
     await navigator.clipboard.writeText(restoreUrl);
+    showToast("Copied restore link");
+  }
+
+  async function refreshHealthStatus() {
+    try {
+      const result = await functionApi.getHealth();
+      setHealth(result);
+      setHealthOpen((current) => !current);
+      showToast("Health status checked");
+    } catch {
+      showToast("Health check failed");
+    }
   }
 
   async function openTypedInbox() {
@@ -363,6 +396,14 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (session?.emailAddress) {
       setDraftEmailAddress(session.emailAddress);
     }
@@ -395,18 +436,45 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
         <div className="absolute bottom-[-18%] right-[10%] h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,rgba(143,16,22,0.3),rgba(90,10,16,0.08)_44%,transparent_70%)] blur-3xl animate-[redFlow_34s_ease-in-out_infinite]" />
       </div>
 
-      <div className="relative mx-auto grid h-[calc(100vh-2rem)] max-w-7xl grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
+      <div className="relative mx-auto grid h-[calc(100vh-1rem)] max-w-7xl grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
         <header className="glass-panel rounded-[1.75rem] border border-white/10 px-4 py-3 shadow-panel sm:px-5 sm:py-4">
           <div className="flex h-full flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.34em] text-white/34">Temp Mail</p>
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-white/34">Temp Mail</p>
+                </div>
+                <div className="glass-soft flex min-w-[16rem] flex-1 items-center gap-2 rounded-[1.25rem] border border-white/10 px-3 py-2 sm:max-w-md">
+                  <Search className="h-4 w-4 text-white/40" />
+                  <input
+                    type="email"
+                    value={lookupEmailAddress}
+                    onChange={(event) => setLookupEmailAddress(event.target.value)}
+                    placeholder="Open existing inbox"
+                    className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/28"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void openTypedInbox()}
+                    className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 px-3 text-xs uppercase tracking-[0.18em] text-white/75 transition hover:border-white/20 hover:text-white"
+                  >
+                    Open
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void createNewInbox(domainPreference)}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-redtone-400/40 bg-redtone-500/20 px-5 text-sm font-medium text-white transition hover:bg-redtone-500/30"
+                >
+                  {syncStatus === "creating" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                  New
+                </button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <LiveIndicator syncStatus={syncStatus} lastSyncedAt={lastSyncedAt} />
                 <button
                   type="button"
-                  onClick={() => setHealthOpen((current) => !current)}
+                  onClick={() => void refreshHealthStatus()}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-white/80 transition hover:border-redtone-400/35 hover:bg-redtone-500/10 hover:text-white"
                 >
                   <Info className="h-4 w-4" />
@@ -423,7 +491,7 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="glass-soft min-w-0 rounded-[1.25rem] border border-white/10 px-4 py-3">
                 <div className="flex items-center gap-2 font-[family-name:var(--font-mono)] text-sm sm:text-lg">
                   <input
@@ -439,29 +507,21 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                   <span className="shrink-0 text-white/70">@{lockedDomain}</span>
                   <Lock className="h-4 w-4 shrink-0 text-white/35" />
                 </div>
+                {session?.emailAddress ? (
+                  <button
+                    type="button"
+                    onClick={() => void copyEmailAddress()}
+                    className="mt-2 inline-flex max-w-full items-center gap-2 text-xs text-white/45 transition hover:text-white/80"
+                  >
+                    <Copy className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{session.emailAddress}</span>
+                  </button>
+                ) : null}
               </div>
 
               {/* <div className="min-w-[13rem]">
                 <DomainSelect value={domainPreference} onChange={handleDomainPreferenceChange} />
               </div> */}
-
-              <div className="glass-soft flex min-w-[16rem] items-center gap-2 rounded-[1.25rem] border border-white/10 px-3 py-2">
-                <Search className="h-4 w-4 text-white/40" />
-                <input
-                  type="email"
-                  value={lookupEmailAddress}
-                  onChange={(event) => setLookupEmailAddress(event.target.value)}
-                  placeholder="Open existing inbox"
-                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/28"
-                />
-                <button
-                  type="button"
-                  onClick={() => void openTypedInbox()}
-                  className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 px-3 text-xs uppercase tracking-[0.18em] text-white/75 transition hover:border-white/20 hover:text-white"
-                >
-                  Open
-                </button>
-              </div>
 
               <button
                 type="button"
@@ -473,14 +533,6 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                 {copied ? "Copied" : "Copy"}
               </button>
 
-              <button
-                type="button"
-                onClick={() => void createNewInbox(domainPreference)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-redtone-400/40 bg-redtone-500/20 px-5 text-sm font-medium text-white transition hover:bg-redtone-500/30"
-              >
-                {syncStatus === "creating" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                New
-              </button>
             </div>
 
             {errorMessage ? (
@@ -765,6 +817,14 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-[70]">
+          <div className="rounded-full border border-redtone-400/30 bg-[#120608]/95 px-4 py-2 text-sm text-white shadow-panel backdrop-blur">
+            {toast.message}
           </div>
         </div>
       ) : null}
