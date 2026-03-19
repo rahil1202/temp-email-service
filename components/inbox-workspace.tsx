@@ -29,6 +29,12 @@ type InboxWorkspaceProps = {
   initialEmailAddress?: string;
 };
 
+function splitEmailAddress(emailAddress: string) {
+  const normalized = emailAddress.trim().toLowerCase();
+  const [localPart = "", domain = ""] = normalized.split("@");
+  return { localPart, domain };
+}
+
 function isExpired(expiresAt: string) {
   return new Date(expiresAt).getTime() <= Date.now();
 }
@@ -120,6 +126,13 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
   const initializedRef = useRef(false);
 
   const activeEmailId = selectedEmailId ?? emails[0]?.id ?? null;
+  const sessionDomain = session?.emailAddress ? splitEmailAddress(session.emailAddress).domain : session?.domain ?? "";
+  const draftParts = splitEmailAddress(draftEmailAddress);
+  const lockedDomain =
+    domainPreference !== "random"
+      ? domainPreference
+      : (draftParts.domain || sessionDomain || publicEnv.domains[0] || "");
+  const editableLocalPart = draftParts.localPart;
   const restoreUrl = useMemo(() => {
     if (!session) {
       return "";
@@ -166,8 +179,10 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     try {
       const normalizedDraft = draftEmailAddress.trim().toLowerCase();
       const currentEmail = session?.emailAddress?.trim().toLowerCase() ?? "";
+      const nextPreferredDomain =
+        preferredDomain === "random" && session?.domain ? session.domain : preferredDomain;
       const result = await functionApi.createInbox({
-        preferredDomain,
+        preferredDomain: nextPreferredDomain,
         customEmailAddress: normalizedDraft && normalizedDraft !== currentEmail ? normalizedDraft : undefined
       });
 
@@ -185,7 +200,7 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
       setSyncStatus("error");
       setErrorMessage(error instanceof Error ? error.message : "Unable to create inbox");
     }
-  }, [domainPreference, draftEmailAddress, session?.emailAddress, setEmails, setErrorMessage, setLastSyncedAt, setSelectedEmail, setSelectedEmailId, setSession, setSyncStatus, syncInbox]);
+  }, [domainPreference, draftEmailAddress, session?.domain, session?.emailAddress, setEmails, setErrorMessage, setLastSyncedAt, setSelectedEmail, setSelectedEmailId, setSession, setSyncStatus, syncInbox]);
 
   const restoreSession = useCallback(async (emailAddress: string, accessToken: string) => {
     const currentSession: InboxSession = {
@@ -353,6 +368,21 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     }
   }, [session?.emailAddress]);
 
+  function handleDraftLocalPartChange(value: string) {
+    const nextLocalPart = value.trim().toLowerCase().replace(/@.*$/, "");
+    setDraftEmailAddress(nextLocalPart ? `${nextLocalPart}@${lockedDomain}` : "");
+  }
+
+  function handleDomainPreferenceChange(value: DomainPreference) {
+    setDomainPreference(value);
+    const nextDomain =
+      value !== "random"
+        ? value
+        : (draftParts.domain || sessionDomain || publicEnv.domains[0] || "");
+
+    setDraftEmailAddress(draftParts.localPart ? `${draftParts.localPart}@${nextDomain}` : "");
+  }
+
   const attachments = selectedEmail?.attachments ?? [];
 
   return (
@@ -395,21 +425,25 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
 
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
               <div className="glass-soft min-w-0 rounded-[1.25rem] border border-white/10 px-4 py-3">
-                <input
-                  type="text"
-                  value={draftEmailAddress}
-                  onChange={(event) => setDraftEmailAddress(event.target.value)}
-                  placeholder={publicEnv.domains[0] ? `name@${publicEnv.domains[0]}` : "name@example.com"}
-                  className="w-full bg-transparent font-[family-name:var(--font-mono)] text-sm text-white outline-none placeholder:text-white/28 sm:text-lg"
-                  spellCheck={false}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                />
+                <div className="flex items-center gap-2 font-[family-name:var(--font-mono)] text-sm sm:text-lg">
+                  <input
+                    type="text"
+                    value={editableLocalPart}
+                    onChange={(event) => handleDraftLocalPartChange(event.target.value)}
+                    placeholder="name"
+                    className="min-w-0 flex-1 bg-transparent text-white outline-none placeholder:text-white/28"
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                  />
+                  <span className="shrink-0 text-white/70">@{lockedDomain}</span>
+                  <Lock className="h-4 w-4 shrink-0 text-white/35" />
+                </div>
               </div>
 
-              <div className="min-w-[13rem]">
-                <DomainSelect value={domainPreference} onChange={setDomainPreference} />
-              </div>
+              {/* <div className="min-w-[13rem]">
+                <DomainSelect value={domainPreference} onChange={handleDomainPreferenceChange} />
+              </div> */}
 
               <div className="glass-soft flex min-w-[16rem] items-center gap-2 rounded-[1.25rem] border border-white/10 px-3 py-2">
                 <Search className="h-4 w-4 text-white/40" />
