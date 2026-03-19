@@ -21,6 +21,7 @@ function makeServices(overrides: Partial<FunctionServices> = {}) {
     uploadAttachment: vi.fn(),
     serializeAttachments: vi.fn((value) => JSON.stringify(value)),
     parseAttachments: vi.fn((value?: string) => (value ? JSON.parse(value) : [])),
+    log: vi.fn(),
     verifyInboxAccess: vi.fn(),
     updateInbox: vi.fn(),
     listInboxEmails: vi.fn(),
@@ -69,6 +70,10 @@ describe("function handlers", () => {
 
     expect(result.ignored).toBe(true);
     expect(services.createEmailDocument).not.toHaveBeenCalled();
+    expect(services.log).toHaveBeenCalledWith("receive-email completed", expect.objectContaining({
+      recipient: "aarav.sharma@pdfwork.space",
+      reason: "unknown_or_expired_inbox"
+    }));
   });
 
   it("returns newest inbox emails when token is valid", async () => {
@@ -102,6 +107,10 @@ describe("function handlers", () => {
     expect(result.emails).toHaveLength(1);
     expect(result.session.displayName).toBe("Aarav Sharma");
     expect(services.updateInbox).toHaveBeenCalled();
+    expect(services.log).toHaveBeenCalledWith("get-inbox returning emails", expect.objectContaining({
+      emailAddress: "aarav.sharma@pdfwork.space",
+      emailCount: 1
+    }));
   });
 
   it("cascades email and attachment deletion during cleanup", async () => {

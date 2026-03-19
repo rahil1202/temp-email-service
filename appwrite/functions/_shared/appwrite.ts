@@ -33,7 +33,14 @@ async function listAllDocuments<T extends Models.Document>(
   return documents;
 }
 
-export function createFunctionServices(headers: Record<string, string>) {
+function sortEmailsNewestFirst<T extends { received_at: string }>(documents: T[]) {
+  return [...documents].sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
+}
+
+export function createFunctionServices(
+  headers: Record<string, string>,
+  logger: (...args: unknown[]) => void = () => undefined
+) {
   const env = getFunctionEnv();
   const dynamicKey = headers["x-appwrite-key"] ?? headers["X-Appwrite-Key"] ?? process.env.APPWRITE_API_KEY;
 
@@ -48,6 +55,7 @@ export function createFunctionServices(headers: Record<string, string>) {
 
   return {
     env,
+    log: logger,
     databases,
     storage,
     async findInboxByEmail(emailAddress: string) {
@@ -71,18 +79,45 @@ export function createFunctionServices(headers: Record<string, string>) {
       return databases.createDocument<EmailDocument>(env.databaseId, env.emailsCollectionId, ID.unique(), data);
     },
     async listInboxEmails(emailAddress: string) {
-      const result = await databases.listDocuments<EmailDocument>(env.databaseId, env.emailsCollectionId, [
-        Query.equal("email_address", emailAddress),
-        Query.orderDesc("received_at"),
-        Query.limit(100)
-      ]);
-      return result.documents;
+      try {
+        const result = await databases.listDocuments<EmailDocument>(env.databaseId, env.emailsCollectionId, [
+          Query.equal("email_address", emailAddress),
+          Query.orderDesc("received_at"),
+          Query.limit(100)
+        ]);
+        return result.documents;
+      } catch (error) {
+        logger("listInboxEmails ordered query failed, using fallback sort", {
+          emailAddress,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        const fallback = await databases.listDocuments<EmailDocument>(env.databaseId, env.emailsCollectionId, [
+          Query.equal("email_address", emailAddress),
+          Query.limit(100)
+        ]);
+
+        return sortEmailsNewestFirst(fallback.documents);
+      }
     },
     async listInboxEmailsAll(emailAddress: string) {
-      return listAllDocuments<EmailDocument>(databases, env.databaseId, env.emailsCollectionId, [
-        Query.equal("email_address", emailAddress),
-        Query.orderDesc("received_at")
-      ]);
+      try {
+        return await listAllDocuments<EmailDocument>(databases, env.databaseId, env.emailsCollectionId, [
+          Query.equal("email_address", emailAddress),
+          Query.orderDesc("received_at")
+        ]);
+      } catch (error) {
+        logger("listInboxEmailsAll ordered query failed, using fallback sort", {
+          emailAddress,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        const fallback = await listAllDocuments<EmailDocument>(databases, env.databaseId, env.emailsCollectionId, [
+          Query.equal("email_address", emailAddress)
+        ]);
+
+        return sortEmailsNewestFirst(fallback);
+      }
     },
     async getEmail(documentId: string) {
       return databases.getDocument<EmailDocument>(env.databaseId, env.emailsCollectionId, documentId);

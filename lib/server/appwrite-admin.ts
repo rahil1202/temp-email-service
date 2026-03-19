@@ -13,6 +13,10 @@ function requireValue(name: string) {
   return value;
 }
 
+function sortEmailsNewestFirst<T extends { received_at: string }>(documents: T[]) {
+  return [...documents].sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
+}
+
 export function createAdminAppwrite() {
   const endpoint = requireValue("APPWRITE_API_ENDPOINT");
   const projectId = requireValue("APPWRITE_PROJECT_ID");
@@ -112,12 +116,27 @@ export async function listLookupInboxEmails(emailAddress: string) {
   }
 
   const cutoffIso = new Date(Date.now() - LOOKUP_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
-  const emails = await admin.databases.listDocuments<EmailDocument>(admin.databaseId, admin.emailsCollectionId, [
-    Query.equal("email_address", emailAddress),
-    Query.greaterThanEqual("received_at", cutoffIso),
-    Query.orderDesc("received_at"),
-    Query.limit(100)
-  ]);
+  let emails;
+
+  try {
+    emails = await admin.databases.listDocuments<EmailDocument>(admin.databaseId, admin.emailsCollectionId, [
+      Query.equal("email_address", emailAddress),
+      Query.greaterThanEqual("received_at", cutoffIso),
+      Query.orderDesc("received_at"),
+      Query.limit(100)
+    ]);
+  } catch {
+    const fallback = await admin.databases.listDocuments<EmailDocument>(admin.databaseId, admin.emailsCollectionId, [
+      Query.equal("email_address", emailAddress),
+      Query.greaterThanEqual("received_at", cutoffIso),
+      Query.limit(100)
+    ]);
+
+    emails = {
+      ...fallback,
+      documents: sortEmailsNewestFirst(fallback.documents)
+    };
+  }
 
   return { admin, inbox, emails: emails.documents };
 }

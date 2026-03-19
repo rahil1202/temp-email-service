@@ -9,8 +9,12 @@ export default async function main(context: AppwriteContext) {
   if (preflight) return preflight;
 
   try {
-    const services = createFunctionServices(context.req.headers);
+    const services = createFunctionServices(context.req.headers, context.log);
     const body = parseGetInboxInput(context.req.bodyJson ?? {});
+    context.log("get-inbox request", {
+      method: context.req.method,
+      emailAddress: body.emailAddress
+    });
     const result = await getInbox(services, body);
     return json(context, result);
   } catch (error) {

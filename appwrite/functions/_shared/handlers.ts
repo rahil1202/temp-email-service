@@ -122,14 +122,28 @@ export async function getInbox(
   input: GetInboxInput
 ): Promise<GetInboxResult> {
   const emailAddress = normalizeEmailAddress(input.emailAddress);
+  services.log("get-inbox requested", { emailAddress });
   const inbox = await services.findInboxByEmail(emailAddress);
+  const accessValid = services.verifyInboxAccess(inbox, input.accessToken);
+  const expired = inbox ? isExpired(inbox.expires_at) : false;
 
-  if (!services.verifyInboxAccess(inbox, input.accessToken) || !inbox || isExpired(inbox.expires_at)) {
+  services.log("get-inbox resolved inbox", {
+    emailAddress,
+    inboxFound: Boolean(inbox),
+    tokenValid: accessValid,
+    expired
+  });
+
+  if (!accessValid || !inbox || expired) {
     throw new Error("Inbox access denied");
   }
 
   await services.updateInbox(inbox.$id, { last_seen_at: new Date().toISOString() });
   const emails = await services.listInboxEmails(emailAddress);
+  services.log("get-inbox returning emails", {
+    emailAddress,
+    emailCount: emails.length
+  });
 
   return {
     session: {
@@ -210,13 +224,32 @@ export async function receiveEmail(
   payload: ParsedMailgunPayload
 ) {
   if (!verifyMailgunSignature(payload, services.env.mailgunSigningKey)) {
+    services.log("receive-email rejected", {
+      method: "POST",
+      reason: "invalid_signature"
+    });
     return { accepted: false, ignored: false, reason: "invalid_signature" as const };
   }
 
+  services.log("receive-email payload parsed", {
+    method: "POST"
+  });
   const normalized = normalizeInboundContent(payload);
+  services.log("receive-email normalized recipient", {
+    recipient: normalized.recipient
+  });
   const inbox = await services.findInboxByEmail(normalized.recipient);
+  services.log("receive-email inbox lookup", {
+    recipient: normalized.recipient,
+    inboxFound: Boolean(inbox),
+    expired: inbox ? isExpired(inbox.expires_at) : false
+  });
 
   if (!inbox || isExpired(inbox.expires_at)) {
+    services.log("receive-email completed", {
+      recipient: normalized.recipient,
+      reason: "unknown_or_expired_inbox"
+    });
     return { accepted: true, ignored: true, reason: "unknown_or_expired_inbox" as const };
   }
 
@@ -231,7 +264,7 @@ export async function receiveEmail(
     attachments.push(uploaded);
   }
 
-  await services.createEmailDocument({
+  const storedEmail = await services.createEmailDocument({
     email_address: normalized.recipient,
     sender: normalized.sender,
     subject: normalized.subject,
@@ -239,6 +272,15 @@ export async function receiveEmail(
     body_html: normalized.bodyHtml,
     attachments: services.serializeAttachments(attachments),
     received_at: normalized.receivedAt
+  });
+
+  services.log("receive-email stored document", {
+    recipient: normalized.recipient,
+    emailId: storedEmail.$id
+  });
+  services.log("receive-email completed", {
+    recipient: normalized.recipient,
+    reason: "stored"
   });
 
   return { accepted: true, ignored: false, reason: "stored" as const };

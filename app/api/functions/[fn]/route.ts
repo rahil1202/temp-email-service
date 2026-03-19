@@ -97,6 +97,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const status = execution.responseStatusCode ?? 500;
   const responseBody = execution.responseBody ?? "";
 
+  if (fn === "get-inbox") {
+    try {
+      const parsedBody = body ? JSON.parse(body) : {};
+      console.info("get-inbox proxy execution", {
+        emailAddress: parsedBody.emailAddress,
+        responseStatusCode: status,
+        responseBodyPreview: typeof responseBody === "string" ? responseBody.slice(0, 300) : ""
+      });
+    } catch {
+      console.info("get-inbox proxy execution", {
+        responseStatusCode: status,
+        responseBodyPreview: typeof responseBody === "string" ? responseBody.slice(0, 300) : ""
+      });
+    }
+  }
+
   return new NextResponse(responseBody, {
     status,
     headers: { "content-type": "application/json" }

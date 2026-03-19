@@ -288,6 +288,25 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
     }
   }
 
+  async function verifyLiveInbox() {
+    if (!session || lookupMode) {
+      showToast("Live inbox unavailable");
+      return;
+    }
+
+    try {
+      const result = await functionApi.getInbox({
+        emailAddress: session.emailAddress,
+        accessToken: session.accessToken
+      });
+      setErrorMessage(null);
+      showToast(`Live inbox returned ${result.emails.length} emails`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to verify live inbox");
+      showToast("Live inbox check failed");
+    }
+  }
+
   async function openTypedInbox() {
     if (!lookupEmailAddress.trim()) {
       setErrorMessage("Enter an inbox email address");
@@ -479,6 +498,14 @@ export function InboxWorkspace({ initialEmailAddress }: InboxWorkspaceProps) {
                 >
                   <Info className="h-4 w-4" />
                   Health
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void verifyLiveInbox()}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-white/80 transition hover:border-redtone-400/35 hover:bg-redtone-500/10 hover:text-white"
+                >
+                  <ScanLine className="h-4 w-4" />
+                  Verify
                 </button>
                 <button
                   type="button"

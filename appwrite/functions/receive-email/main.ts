@@ -31,7 +31,11 @@ export default async function main(context: AppwriteContext) {
   if (preflight) return preflight;
 
   try {
-    const services = createFunctionServices(context.req.headers);
+    context.log("receive-email request", {
+      method: context.req.method,
+      path: context.req.path ?? "/"
+    });
+    const services = createFunctionServices(context.req.headers, context.log);
     const payloadSize = measurePayloadSize(context);
 
     if (payloadSize > services.env.maxMessageSizeBytes) {
